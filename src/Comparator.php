@@ -52,15 +52,17 @@ if ( ! class_exists( 'Comparator' ) ) :
 		 */
 		private array $validOperators = [
 			'==',
+			'===',
 			'!=',
+			'!==',
 			'>',
 			'<',
 			'>=',
 			'<=',
-			'regex',
 			'starts',
-			'contains',
-			'ends'
+			'ends',
+			'all',
+			'any'
 		];
 
 		/**
@@ -69,26 +71,16 @@ if ( ! class_exists( 'Comparator' ) ) :
 		private float $epsilon; // Default value can be adjusted as needed
 
 		/**
-		 * @var string Match type for array comparisons - 'all' or 'any'.
-		 */
-		private string $matchType;
-
-		/**
 		 * Constructor.
 		 *
 		 * @param ?string $type          Optional. The type of comparison to perform. Defaults to null for auto-detection.
 		 * @param bool    $caseSensitive Optional. Whether the string comparison should be case-sensitive. Defaults to true.
-		 * @param string  $matchType     Optional. The match type for array comparisons - 'all' or 'any'. Defaults to 'all'.
 		 * @param float   $epsilon       Optional. The tolerance level for floating-point comparisons. Defaults to 1.0e-10.
 		 */
-		public function __construct( ?string $type = null, bool $caseSensitive = true, string $matchType = 'all', float $epsilon = 1.0e-10 ) {
+		public function __construct( ?string $type = null, bool $caseSensitive = true, float $epsilon = 1.0e-10 ) {
 			$this->type          = $type;
 			$this->caseSensitive = $caseSensitive;
-			$this->matchType     = $matchType;
 			$this->epsilon       = $epsilon;
-			if ( ! in_array( $matchType, [ 'all', 'any' ] ) ) {
-				throw new InvalidArgumentException( "Invalid match type: $matchType. Allowed types are 'all' or 'any'." );
-			}
 		}
 
 		/** Setters *******************************************************************/
@@ -132,23 +124,6 @@ if ( ! class_exists( 'Comparator' ) ) :
 			return $this;
 		}
 
-		/**
-		 * Sets the match type for array comparisons.
-		 *
-		 * @param string $matchType The match type ('all' or 'any').
-		 *
-		 * @return self For method chaining.
-		 */
-		public function setMatchType( string $matchType ): self {
-			if ( in_array( $matchType, [ 'all', 'any' ] ) ) {
-				$this->matchType = $matchType;
-			} else {
-				throw new InvalidArgumentException( "Invalid match type: $matchType. Allowed types are 'all' or 'any'." );
-			}
-
-			return $this;
-		}
-
 		/** Comparison ****************************************************************/
 
 		/**
@@ -156,13 +131,13 @@ if ( ! class_exists( 'Comparator' ) ) :
 		 *
 		 * @param mixed         $value1         The first value to compare.
 		 * @param mixed         $value2         The second value to compare.
-		 * @param string        $operator       The comparison operator or 'custom' for using a custom function.
+		 * @param string        $operator       The comparison operator or 'custom' for using a custom function. Defaults to '='.
 		 * @param callable|null $customFunction Optional. The custom function to use for comparison if 'custom' operator is used.
 		 *
 		 * @return bool The result of the comparison.
 		 * @throws InvalidArgumentException If an invalid operator or custom function is provided.
 		 */
-		public function compare( $value1, $value2, string $operator, callable $customFunction = null, bool $useEpsilon = false ): bool {
+		public function compare( $value1, $value2, string $operator = '=', callable $customFunction = null, bool $useEpsilon = false ): bool {
 			$operator = strtolower( trim( $operator ) );
 
 			if ( $operator === 'custom' && is_callable( $customFunction ) ) {
@@ -209,7 +184,46 @@ if ( ! class_exists( 'Comparator' ) ) :
 
 		}
 
-		/** Comparison ****************************************************************/
+		/** Validation ****************************************************************/
+
+		/**
+		 * Translates a human-readable operator into its corresponding symbol.
+		 *
+		 * @param string $operator The human-readable operator.
+		 *
+		 * @return string The operator symbol or the original operator if not found.
+		 */
+		private function translateOperator( string $operator ): string {
+
+			// Mapping of operator aliases to their canonical form
+			$operatorAliases = [
+				'=='     => [ 'equal_to', 'equals', '=' ],
+				'==='    => [ 'strict_equal_to' ],
+				'!='     => [ 'not_equal_to', 'not_equals' ],
+				'!=='    => [ 'strict_not_equal_to' ],
+				'>'      => [ 'more_than', 'greater_than' ],
+				'<'      => [ 'less_than' ],
+				'>='     => [ 'at_least', 'greater_than_or_equal_to' ],
+				'<='     => [ 'at_most', 'less_than_or_equal_to' ],
+				'starts' => [ 'startswith', 'starts_with', 'begins_with' ],
+				'ends'   => [ 'endswith', 'ends_with' ],
+				'all'    => [ 'includes_all', 'contains_all', 'has_all', 'match_all' ],
+				'any'    => [ 'includes_any', 'contains_any', 'contains', 'has', 'match_any' ],
+			];
+
+			// Normalize the input operator to lowercase
+			$operatorKey = strtolower( $operator );
+
+			// Search each alias list for the operator key and return the canonical form
+			foreach ( $operatorAliases as $canonical => $aliases ) {
+				if ( $operatorKey === $canonical || in_array( $operatorKey, $aliases ) ) {
+					return $canonical;
+				}
+			}
+
+			// Return the original operator if no alias is found
+			return $operator;
+		}
 
 		/**
 		 * Validates the comparison operator.
@@ -241,7 +255,7 @@ if ( ! class_exists( 'Comparator' ) ) :
 		private function regexComparison( string $subject, string $pattern ): bool {
 
 			// Ensure the pattern is properly delimited
-			$pattern = "/" . str_replace( "/", "\/", $pattern ) . "/u";
+			$pattern = '/' . str_replace( '/', '\/', $pattern ) . '/u';
 
 			if ( @preg_match( $pattern, '' ) === false ) {
 				throw new InvalidArgumentException( "Invalid regular expression: $pattern" );
@@ -270,79 +284,6 @@ if ( ! class_exists( 'Comparator' ) ) :
 		}
 
 		/**
-		 * Translates a human-readable operator into its corresponding symbol.
-		 *
-		 * @param string $operator The human-readable operator.
-		 *
-		 * @return string The operator symbol or the original operator if not found.
-		 */
-		private function translateOperator( string $operator ): string {
-
-			// Mapping of operator aliases to their canonical form
-			$operatorAliases = [
-				'=='               => [ 'equal_to', 'equals', '=' ],
-				'==='              => [ 'strict_equal_to' ],
-				'!='               => [ 'not_equal_to', 'not_equals' ],
-				'!=='              => [ 'strict_not_equal_to' ], // Similar to '===', for strict inequality
-				'>'                => [ 'more_than', 'more', 'greater_than', 'greater' ],
-				'<'                => [ 'less_than', 'less' ],
-				'>='               => [ 'at_least', 'greater_than_or_equal_to', 'greater_or_equal' ],
-				'<='               => [ 'at_most', 'less_than_or_equal_to', 'less_or_equal' ],
-				'starts'           => [ 'startswith', 'starts_with', 'begins' ],
-				'contains'         => [],
-				'does_not_contain' => [ 'not_contains' ],
-				'ends'             => [ 'endswith', 'ends_with' ],
-			];
-
-			// Normalize the input operator to lowercase
-			$operatorKey = strtolower( $operator );
-
-			// Search each alias list for the operator key and return the canonical form
-			foreach ( $operatorAliases as $canonical => $aliases ) {
-				if ( $operatorKey === $canonical || in_array( $operatorKey, $aliases ) ) {
-					return $canonical;
-				}
-			}
-
-			// Return the original operator if no alias is found
-			return $operator;
-		}
-
-		/**
-		 * Detects the type of the values to be compared.
-		 *
-		 * @param mixed $value1 The first value.
-		 * @param mixed $value2 The second value.
-		 *
-		 * @return string The detected type.
-		 */
-		private function detectType( $value1, $value2 ): string {
-			if ( is_float( $value1 ) || is_float( $value2 ) ) {
-				return 'float';
-			} elseif ( is_int( $value1 ) || is_int( $value2 ) ) {
-				return 'int';
-			} elseif ( is_string( $value1 ) && is_string( $value2 ) ) {
-				if ( $this->isJsonString( $value1 ) && $this->isJsonString( $value2 ) ) {
-					return 'json';
-				}
-
-				return 'string';
-			} elseif ( is_string( $value1 ) && is_array( $value2 ) ) {
-				return 'string';
-			} elseif ( is_bool( $value1 ) || is_bool( $value2 ) ) {
-				return 'bool';
-			} elseif ( is_array( $value1 ) && is_array( $value2 ) ) {
-				return 'array';
-			} elseif ( is_object( $value1 ) && is_object( $value2 ) ) {
-				return 'object';
-			} elseif ( strtotime( $value1 ) !== false && strtotime( $value2 ) !== false ) {
-				return 'date';
-			} else {
-				return 'unknown';
-			}
-		}
-
-		/**
 		 * Performs numeric comparison between two values based on the specified operator.
 		 * Supports epsilon-based comparison for floating-point numbers.
 		 *
@@ -354,6 +295,7 @@ if ( ! class_exists( 'Comparator' ) ) :
 		 * @return bool The result of the comparison. Returns false if an unsupported operator is used.
 		 */
 		private function numericComparison( $value1, $value2, string $operator, bool $useEpsilon = false ): bool {
+
 			// Apply epsilon logic for floating point equality comparisons
 			if ( $useEpsilon && is_float( $value1 ) && is_float( $value2 ) ) {
 				switch ( $operator ) {
@@ -411,32 +353,40 @@ if ( ! class_exists( 'Comparator' ) ) :
 				case '!=':
 					return $value1 != $value2;
 				case 'starts':
-					return strpos( $value1, $value2 ) === 0;
-				case 'contains':
 					if ( is_array( $value2 ) ) {
-						$matches = array_map( function ( $element ) use ( $value1 ) {
-							return strpos( $value1, $element ) !== false;
-						}, $value2 );
+						return strpos( $value1, reset( $value2 ) ) === 0;
+					} else {
+						return strpos( $value1, $value2 ) === 0;
+					}
+				case 'all':
+					if ( is_array( $value2 ) ) {
+						foreach ( $value2 as $element ) {
+							if ( strpos( $value1, $element ) === false ) {
+								return false;
+							}
+						}
 
-						return $this->matchType === 'all' ? ! in_array( false, $matches ) : in_array( true, $matches );
+						return true;
 					} else {
 						return strpos( $value1, $value2 ) !== false;
 					}
-				case 'does_not_contain':
+				case 'any':
 					if ( is_array( $value2 ) ) {
-						$matches = array_map( function ( $element ) use ( $value1 ) {
-							return strpos( $value1, $element ) !== false;
-						}, $value2 );
-
-						if ( $this->matchType === 'all' ) {
-							return ! in_array( true, $matches );
-						} else {
-							return in_array( false, $matches );
+						foreach ( $value2 as $element ) {
+							if ( strpos( $value1, $element ) !== false ) {
+								return true;
+							}
 						}
+
+						return false;
 					} else {
-						return strpos( $value1, $value2 ) === false;
+						return strpos( $value1, $value2 ) !== false;
 					}
 				case 'ends':
+					if ( is_array( $value2 ) ) {
+						$value2 = end( $value2 );
+					}
+
 					return substr( $value1, - strlen( $value2 ) ) === $value2;
 				default:
 					return false;
@@ -471,11 +421,38 @@ if ( ! class_exists( 'Comparator' ) ) :
 		 * @return bool The result of the comparison.
 		 */
 		private function arrayComparison( array $array1, array $array2, string $operator ): bool {
+
+			// Adjust for case sensitivity
+			if ( ! $this->caseSensitive ) {
+				$array1 = array_map( 'strtolower', $array1 );
+				$array2 = array_map( 'strtolower', $array2 );
+			}
+
 			switch ( $operator ) {
 				case '==':
 					return $array1 == $array2;
 				case '!=':
 					return $array1 != $array2;
+				case 'all':
+					foreach ( $array2 as $item ) {
+						if ( ! in_array( $item, $array1, true ) ) {
+							return false;
+						}
+					}
+
+					return true;
+				case 'any':
+					foreach ( $array2 as $item ) {
+						if ( in_array( $item, $array1, true ) ) {
+							return true;
+						}
+					}
+
+					return false;
+				case 'starts':
+					return reset( $array1 ) === reset( $array2 );
+				case 'ends':
+					return end( $array1 ) === end( $array2 );
 				default:
 					return false;
 			}
@@ -504,6 +481,8 @@ if ( ! class_exists( 'Comparator' ) ) :
 		/**
 		 * Compares two objects based on the specified operator or a custom function.
 		 *
+		 * @note Additional logic
+		 *
 		 * @param object $obj1     The first object.
 		 * @param object $obj2     The second object.
 		 * @param string $operator The comparison operator to use.
@@ -525,7 +504,81 @@ if ( ! class_exists( 'Comparator' ) ) :
 			}
 		}
 
+		/**
+		 * Compares the hash values of two inputs.
+		 *
+		 * @param mixed  $value1    The first value to hash and compare.
+		 * @param mixed  $value2    The second value to hash and compare.
+		 * @param string $algorithm The hash algorithm to use (e.g., 'sha256').
+		 *
+		 * @return bool Returns true if the hash values match, false otherwise.
+		 */
+		public function hashComparison( $value1, $value2, string $algorithm = 'sha256' ): bool {
+			if ( ! in_array( $algorithm, hash_algos() ) ) {
+				throw new InvalidArgumentException( "Unsupported hash algorithm: $algorithm" );
+			}
+
+			$hash1 = hash( $algorithm, $this->normalizeValueForHashing( $value1 ) );
+			$hash2 = hash( $algorithm, $this->normalizeValueForHashing( $value2 ) );
+
+			return $hash1 === $hash2;
+		}
+
+		/**
+		 * Normalizes a value for hashing. This primarily involves converting complex structures like arrays and objects
+		 * to a JSON string to ensure consistent hashing. Simpler types are converted to strings directly.
+		 *
+		 * @param mixed $value The value to normalize.
+		 *
+		 * @return string The normalized value.
+		 */
+		protected function normalizeValueForHashing( $value ): string {
+			if ( is_array( $value ) || is_object( $value ) ) {
+				return json_encode( $value );
+			} elseif ( is_bool( $value ) ) {
+				return $value ? 'true' : 'false';
+			} elseif ( is_null( $value ) ) {
+				return 'null'; // Lowercase to match JSON representation of null.
+			} else {
+				return (string) $value;
+			}
+		}
+
 		/** Helpers ****************************************************************/
+
+		/**
+		 * Detects the type of the values to be compared.
+		 *
+		 * @param mixed $value1 The first value.
+		 * @param mixed $value2 The second value.
+		 *
+		 * @return string The detected type.
+		 */
+		private function detectType( $value1, $value2 ): string {
+			if ( is_float( $value1 ) || is_float( $value2 ) ) {
+				return 'float';
+			} elseif ( is_int( $value1 ) || is_int( $value2 ) ) {
+				return 'int';
+			} elseif ( is_string( $value1 ) && is_string( $value2 ) ) {
+				if ( $this->isJsonString( $value1 ) && $this->isJsonString( $value2 ) ) {
+					return 'json';
+				}
+
+				return 'string';
+			} elseif ( is_string( $value1 ) && is_array( $value2 ) ) {
+				return 'string';
+			} elseif ( is_bool( $value1 ) || is_bool( $value2 ) ) {
+				return 'bool';
+			} elseif ( is_array( $value1 ) && is_array( $value2 ) ) {
+				return 'array';
+			} elseif ( is_object( $value1 ) && is_object( $value2 ) ) {
+				return 'object';
+			} elseif ( strtotime( $value1 ) !== false && strtotime( $value2 ) !== false ) {
+				return 'date';
+			} else {
+				return 'unknown';
+			}
+		}
 
 		/**
 		 * Converts a value to an array. It handles JSON strings and objects by converting them to arrays.

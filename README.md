@@ -31,15 +31,15 @@ flexibility for custom comparison logic and error handling.
 
 ```php
 comparator(
-    mixed $value1,
-    mixed $value2,
-    string $operator,
-    ?string $type = null,
-    bool $caseSensitive = true,
-    bool $useEpsilon = false,
-    string $matchType = 'all',
-    ?callable $customFunction = null,
-    ?callable $errorCallback = null
+  $value1,
+  $value2,
+  string $operator,
+  ?string $type = null,
+  bool $caseSensitive = true,
+  bool $useEpsilon = false,
+  ?callable $customFunction = null,
+  float $epsilon = 1.0e-10,
+  ?callable $errorCallback = null
 ): ?bool
 ```
 
@@ -50,8 +50,8 @@ comparator(
 - `$type`: Specifies the type of comparison. If `null`, the type is auto-detected.
 - `$caseSensitive`: Determines if string comparisons are case-sensitive. Defaults to `true`.
 - `$useEpsilon`: Utilize epsilon for floating-point comparisons to handle precision issues.
-- `$matchType`: The match type for array comparisons - 'all' or 'any'. Defaults to `all`.
 - `$customFunction`: A custom function for comparison, used when the operator is set to 'custom'.
+- `$epsilon`: The tolerance level for floating-point comparisons. Defaults to 1.0e-10.
 - `$errorCallback`: A callback for error handling, invoked if an exception occurs during comparison.
 
 ### Return Value
@@ -61,7 +61,7 @@ Returns a boolean indicating the result of the comparison, or `null` in case of 
 ### Usage Example
 
 ```php
-$result = comparator( 'hello', 'Hello', '=', null, false ); // Case-insensitive string comparison
+$result = comparator( 'hello', 'Hello', '=', false ); // Case-insensitive string comparison
 if ( $result ) {
     // Values are considered equal
 }
@@ -77,20 +77,20 @@ comparison operators. To make the class more intuitive and user-friendly, it all
 for these operators. Below is a table that maps these aliases to their corresponding standard operator symbols,
 providing an easy reference for users to construct their comparison expressions.
 
-| Operator Symbol    | Human-Readable Aliases                               | Description                                                                    |
-|--------------------|------------------------------------------------------|--------------------------------------------------------------------------------|
-| `==`               | equal_to, equals, =                                  | Checks if two values are equal                                                 |
-| `===`              | strict_equal_to                                      | Checks if two values are strictly equal (identical)                            |
-| `!=`               | not_equal_to, not_equals                             | Checks if two values are not equal                                             |
-| `!==`              | strict_not_equal_to                                  | Checks if two values are strictly not equal                                    |
-| `>`                | more_than, more, greater_than, greater               | Checks if value on the left is greater than the value on the right             |
-| `<`                | less_than, less                                      | Checks if value on the left is less than the value on the right                |
-| `>=`               | at_least, greater_than_or_equal_to, greater_or_equal | Checks if value on the left is greater than or equal to the value on the right |
-| `<=`               | at_most, less_than_or_equal_to, less_or_equal        | Checks if value on the left is less than or equal to the value on the right    |
-| `starts`           | startswith, starts_with, begins                      | Checks if a string starts with a specified substring                           |
-| `contains`         | (no aliases)                                         | Checks if a string contains a specified substring                              |
-| `does_not_contain` | not_contains                                         | Checks if a string does not contain a specified substring                      |
-| `ends`             | endswith, ends_with                                  | Checks if a string ends with a specified substring                             |
+| Operator Symbol | Human-Readable Aliases                               | Description                                                                    |
+|-----------------|------------------------------------------------------|--------------------------------------------------------------------------------|
+| `==`            | equal_to, equals, =                                  | Checks if two values are equal                                                 |
+| `===`           | strict_equal_to                                      | Checks if two values are strictly equal (identical)                            |
+| `!=`            | not_equal_to, not_equals                             | Checks if two values are not equal                                             |
+| `!==`           | strict_not_equal_to                                  | Checks if two values are strictly not equal                                    |
+| `>`             | more_than, greater_than                              | Checks if value on the left is greater than the value on the right             |
+| `<`             | less_than                                            | Checks if value on the left is less than the value on the right                |
+| `>=`            | at_least, greater_than_or_equal_to                   | Checks if value on the left is greater than or equal to the value on the right |
+| `<=`            | at_most, less_than_or_equal_to                       | Checks if value on the left is less than or equal to the value on the right    |
+| `starts`        | startswith, starts_with, begins_with                 | Checks if a string starts with a specified substring                           |
+| `ends`          | endswith, ends_with                                  | Checks if a string ends with a specified substring                             |
+| `all`           | includes_all, contains_all, has_all, match_all       | Checks if all specified conditions or values are included or match             |
+| `any`           | includes_any, contains_any, contains, has, match_any | Checks if any of the specified conditions or values are included or match      |
 
 This feature enhances the readability and expressiveness of your code, making it easier to understand and maintain.
 
@@ -164,7 +164,7 @@ Compare two JSON strings for equality.
 ```php
 $json1 = '{"name": "John", "age": 30}';
 $json2 = '{"name": "John", "age": 30}';
-$result = comparator( $json1, $json2, '=', 'json' ) ? 'Pass' : 'Fail';
+$result = comparator( $json1, $json2, '=' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -184,7 +184,7 @@ Compare two arrays for equality.
 ```php
 $array1 = [1, 2, 3];
 $array2 = [1, 2, 3];
-$result = comparator( $array1, $array2, '=', 'array' ) ? 'Pass' : 'Fail';
+$result = comparator( $array1, $array2, '=' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -213,7 +213,7 @@ $result = comparator( $obj1, $obj2, '=', 'object' ) ? 'Pass' : 'Fail';
 Compare two dates to check if the first is less than the second.
 
 ```php
-$result = comparator('2023-01-01', '2024-01-01', 'less_than', 'date') ? 'Pass' : 'Fail';
+$result = comparator( '2023-01-01', '2024-01-01', '<' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -222,7 +222,7 @@ $result = comparator('2023-01-01', '2024-01-01', 'less_than', 'date') ? 'Pass' :
 Check if a string contains another string.
 
 ```php
-$result = comparator('Hello world', 'world', 'contains', 'string') ? 'Pass' : 'Fail';
+$result = comparator( 'Hello world', 'world', 'contains' ) ? 'Pass' : 'Fail';
 // Expected output: Fail
 ```
 
@@ -231,7 +231,7 @@ $result = comparator('Hello world', 'world', 'contains', 'string') ? 'Pass' : 'F
 Check if a string starts with another string.
 
 ```php
-$result = comparator('Hello world', 'Hello', 'startswith', 'string') ? 'Pass' : 'Fail';
+$result = comparator( 'Hello world', 'Hello', 'starts' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -240,7 +240,7 @@ $result = comparator('Hello world', 'Hello', 'startswith', 'string') ? 'Pass' : 
 Check if a string ends with another string.
 
 ```php
-$result = comparator('Hello world', 'world', 'endswith', 'string') ? 'Pass' : 'Fail';
+$result = comparator( 'Hello world', 'world', 'ends' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -249,7 +249,7 @@ $result = comparator('Hello world', 'world', 'endswith', 'string') ? 'Pass' : 'F
 Compare two integers to check if they are not equal.
 
 ```php
-$result = comparator(5, 10, 'not_equal_to') ? 'Pass' : 'Fail';
+$result = comparator( 5, 10, '!=' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -258,13 +258,9 @@ $result = comparator(5, 10, 'not_equal_to') ? 'Pass' : 'Fail';
 Compare two integers to check if the first is greater than the second.
 
 ```php
-$result = comparator(10, 5, 'more_than') ? 'Pass' : 'Fail';
+$result = comparator( 10, 5, '>' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
-
-### Example Test 16: Less Than or Equal To Comparison
-
-Compare two integers to check if the first is less than or equal to the second.
 
 ## Contributions
 
