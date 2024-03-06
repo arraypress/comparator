@@ -23,20 +23,21 @@ composer require arraypress/comparator
 
 ## Global Comparison Function
 
-The library provides a convenient global `comparator` function to facilitate easy comparisons between two values with
+The library provides a convenient global `Compare` class to facilitate easy comparisons between two values with
 extensive customization options. This function leverages the `Comparator` class internally while offering additional
 flexibility for custom comparison logic and error handling.
 
 ### Function Signature
 
 ```php
-comparator(
+Compare::values(
   $value1,
   $value2,
   string $operator,
   ?string $type = null,
   bool $caseSensitive = true,
   bool $useEpsilon = false,
+  $value3 = null,
   ?callable $customFunction = null,
   float $epsilon = 1.0e-10,
   ?callable $errorCallback = null
@@ -50,6 +51,7 @@ comparator(
 - `$type`: Specifies the type of comparison. If `null`, the type is auto-detected.
 - `$caseSensitive`: Determines if string comparisons are case-sensitive. Defaults to `true`.
 - `$useEpsilon`: Utilize epsilon for floating-point comparisons to handle precision issues.
+- `$value3`: The upper bound for BETWEEN comparisons.
 - `$customFunction`: A custom function for comparison, used when the operator is set to 'custom'.
 - `$epsilon`: The tolerance level for floating-point comparisons. Defaults to 1.0e-10.
 - `$errorCallback`: A callback for error handling, invoked if an exception occurs during comparison.
@@ -61,7 +63,7 @@ Returns a boolean indicating the result of the comparison, or `null` in case of 
 ### Usage Example
 
 ```php
-$result = comparator( 'hello', 'Hello', '=', false ); // Case-insensitive string comparison
+$result = Compare::values( 'hello', 'Hello', '=', false ); // Case-insensitive string comparison
 if ( $result ) {
     // Values are considered equal
 }
@@ -91,6 +93,11 @@ providing an easy reference for users to construct their comparison expressions.
 | `ends`          | endswith, ends_with                                  | Checks if a string ends with a specified substring                             |
 | `all`           | includes_all, contains_all, has_all, match_all       | Checks if all specified conditions or values are included or match             |
 | `any`           | includes_any, contains_any, contains, has, match_any | Checks if any of the specified conditions or values are included or match      |
+| `between`       | between                                              | Checks if a value falls within a specified range (inclusive)                   |
+| `not between`   | not_between, not between                             | Checks if a value does not fall within a specified range (inclusive)           |
+
+Updated translateOperator Function
+You've already included the necessary updates in your translateOperator function to
 
 This feature enhances the readability and expressiveness of your code, making it easier to understand and maintain.
 
@@ -123,7 +130,7 @@ of the `Comparator` class.
 Compare two integers to check if the first is less than the second.
 
 ```php
-$result = comparator( 5, 10, '<' ) ? 'Pass' : 'Fail';
+$result = Compare::values( 5, 10, '<' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -132,7 +139,7 @@ $result = comparator( 5, 10, '<' ) ? 'Pass' : 'Fail';
 Compare two floats for equality, considering a small margin (epsilon).
 
 ```php
-$result = comparator( 0.1 + 0.2, 0.3, '=', 'float', true, true ) ? 'Pass' : 'Fail';
+$result = Compare::values( 0.1 + 0.2, 0.3, '=', 'float', true, true ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -141,7 +148,7 @@ $result = comparator( 0.1 + 0.2, 0.3, '=', 'float', true, true ) ? 'Pass' : 'Fai
 Compare two strings with case sensitivity.
 
 ```php
-$result = comparator( 'Hello', 'hello', '=', 'string', true ) ? 'Pass' : 'Fail';
+$result = Compare::values( 'Hello', 'hello', '=', 'string', true ) ? 'Pass' : 'Fail';
 // Expected output: Fail (due to case sensitivity)
 ```
 
@@ -153,7 +160,7 @@ Use a custom function for comparison. In this example, checking if the first num
 $customFunction = function ( $a, $b ) {
     return $a == ( $b * 2 );
 };
-$result = comparator( 10, 5, 'custom', null, true, false, 'all', $customFunction ) ? 'Pass' : 'Fail';
+$result = Compare::values( 10, 5, 'custom', null, true, false, 'all', $customFunction ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -164,7 +171,7 @@ Compare two JSON strings for equality.
 ```php
 $json1 = '{"name": "John", "age": 30}';
 $json2 = '{"name": "John", "age": 30}';
-$result = comparator( $json1, $json2, '=' ) ? 'Pass' : 'Fail';
+$result = Compare::values( $json1, $json2, '=' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -173,7 +180,7 @@ $result = comparator( $json1, $json2, '=' ) ? 'Pass' : 'Fail';
 Use a regular expression to compare if a string matches the pattern.
 
 ```php
-$result = comparator( 'test123', '^test', 'regex' ) ? 'Pass' : 'Fail';
+$result = Compare::values( 'test123', '^test', 'regex' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -184,7 +191,7 @@ Compare two arrays for equality.
 ```php
 $array1 = [1, 2, 3];
 $array2 = [1, 2, 3];
-$result = comparator( $array1, $array2, '=' ) ? 'Pass' : 'Fail';
+$result = Compare::values( $array1, $array2, '=' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -193,7 +200,7 @@ $result = comparator( $array1, $array2, '=' ) ? 'Pass' : 'Fail';
 Compare two booleans for equality.
 
 ```php
-$result = comparator( true, true, '=', 'bool' ) ? 'Pass' : 'Fail';
+$result = Compare::values( true, true, '=', 'bool' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -204,7 +211,7 @@ Compare two objects for equality.
 ```php
 $obj1 = (object) [ 'key' => 'value' ];
 $obj2 = (object) [ 'key' => 'value' ];
-$result = comparator( $obj1, $obj2, '=', 'object' ) ? 'Pass' : 'Fail';
+$result = Compare::values( $obj1, $obj2, '=', 'object' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -213,7 +220,7 @@ $result = comparator( $obj1, $obj2, '=', 'object' ) ? 'Pass' : 'Fail';
 Compare two dates to check if the first is less than the second.
 
 ```php
-$result = comparator( '2023-01-01', '2024-01-01', '<' ) ? 'Pass' : 'Fail';
+$result = Compare::values( '2023-01-01', '2024-01-01', '<' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -222,7 +229,7 @@ $result = comparator( '2023-01-01', '2024-01-01', '<' ) ? 'Pass' : 'Fail';
 Check if a string contains another string.
 
 ```php
-$result = comparator( 'Hello world', 'world', 'contains' ) ? 'Pass' : 'Fail';
+$result = Compare::values( 'Hello world', 'world', 'contains' ) ? 'Pass' : 'Fail';
 // Expected output: Fail
 ```
 
@@ -231,7 +238,7 @@ $result = comparator( 'Hello world', 'world', 'contains' ) ? 'Pass' : 'Fail';
 Check if a string starts with another string.
 
 ```php
-$result = comparator( 'Hello world', 'Hello', 'starts' ) ? 'Pass' : 'Fail';
+$result = Compare::values( 'Hello world', 'Hello', 'starts' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -240,7 +247,7 @@ $result = comparator( 'Hello world', 'Hello', 'starts' ) ? 'Pass' : 'Fail';
 Check if a string ends with another string.
 
 ```php
-$result = comparator( 'Hello world', 'world', 'ends' ) ? 'Pass' : 'Fail';
+$result = Compare::values( 'Hello world', 'world', 'ends' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -249,7 +256,7 @@ $result = comparator( 'Hello world', 'world', 'ends' ) ? 'Pass' : 'Fail';
 Compare two integers to check if they are not equal.
 
 ```php
-$result = comparator( 5, 10, '!=' ) ? 'Pass' : 'Fail';
+$result = Compare::values( 5, 10, '!=' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 
@@ -258,7 +265,49 @@ $result = comparator( 5, 10, '!=' ) ? 'Pass' : 'Fail';
 Compare two integers to check if the first is greater than the second.
 
 ```php
-$result = comparator( 10, 5, '>' ) ? 'Pass' : 'Fail';
+$result = Compare::values( 10, 5, '>' ) ? 'Pass' : 'Fail';
+// Expected output: Pass
+```
+
+### Example Test 16: Between Comparison for Numbers
+
+Check if an integer is between two other integers (inclusive).
+
+```php
+$result = Compare::between( 15, 10, 20 ) ? 'Pass' : 'Fail';
+// Expected output: Pass
+```
+
+### Example Test 17: Not Between Comparison for Numbers
+
+Check if an integer is not between two other integers (inclusive).
+
+```php
+$result = Compare::notBetween( 5, 10, 20 ) ? 'Pass' : 'Fail';
+// Expected output: Pass
+```
+
+### Example Test 18: Between Comparison for Dates
+
+Check if a date is between two other dates.
+
+```php
+$dateToCheck = '2023-06-15';
+$startDate = '2023-06-01';
+$endDate = '2023-06-30';
+$result = Compare::between( $dateToCheck, $startDate, $endDate, 'date' ) ? 'Pass' : 'Fail';
+// Expected output: Pass
+```
+
+### Example Test 19: Not Between Comparison for Dates
+
+Check if a date is not between two other dates.
+
+```php
+$dateToCheck = '2023-07-01';
+$startDate = '2023-06-01';
+$endDate = '2023-06-30';
+$result = Compare::notBetween( $dateToCheck, $startDate, $endDate, 'date' ) ? 'Pass' : 'Fail';
 // Expected output: Pass
 ```
 

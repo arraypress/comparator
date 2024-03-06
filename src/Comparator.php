@@ -8,8 +8,8 @@
  * complex types like JSON strings.
  *
  * Usage:
- * - Custom comparison: `$slurp->compare($value1, $value2, 'custom', $customFunction);`
- * - Regular expression comparison: `$slurp->compare($value1, $value2, 'regex');`
+ * - Custom comparison: `Compare::values( $value1, $value2, 'custom', $customFunction );`
+ * - Regular expression comparison: `Compare::values( $value1, $value2, 'regex' );`
  * - Improved type detection for complex types: Automatically detects and compares JSON strings.
  *
  * @package     ArrayPress/Comparator
@@ -50,19 +50,30 @@ if ( ! class_exists( 'Comparator' ) ) :
 		 * @var array List of valid comparison operators including basic mathematical comparisons,
 		 * regular expression checks, and string-specific checks such as starts with, contains, and ends with.
 		 */
-		private array $validOperators = [
+		const VALID_OPERATORS = [
 			'==',
 			'===',
 			'!=',
 			'!==',
 			'>',
-			'<',
 			'>=',
+			'<',
 			'<=',
 			'starts',
 			'ends',
 			'all',
-			'any'
+			'any',
+			'between',
+			'not_between'
+		];
+
+		/**
+		 * @var array List of operators specifically for regular expression comparison.
+		 */
+		const REGEX_OPERATORS = [
+			'regex',
+			'reg',
+			'rx'
 		];
 
 		/**
@@ -133,18 +144,20 @@ if ( ! class_exists( 'Comparator' ) ) :
 		 * @param mixed         $value2         The second value to compare.
 		 * @param string        $operator       The comparison operator or 'custom' for using a custom function. Defaults to '='.
 		 * @param callable|null $customFunction Optional. The custom function to use for comparison if 'custom' operator is used.
+		 * @param bool          $useEpsilon     Indicates whether to use epsilon for floating-point comparison.
+		 * @param mixed         $value3         Optional. The upper bound for BETWEEN comparisons.
 		 *
 		 * @return bool The result of the comparison.
 		 * @throws InvalidArgumentException If an invalid operator or custom function is provided.
 		 */
-		public function compare( $value1, $value2, string $operator = '=', callable $customFunction = null, bool $useEpsilon = false ): bool {
+		public function compare( $value1, $value2, string $operator = '=', callable $customFunction = null, bool $useEpsilon = false, $value3 = null ): bool {
 			$operator = strtolower( trim( $operator ) );
 
 			if ( $operator === 'custom' && is_callable( $customFunction ) ) {
 				return $customFunction( $value1, $value2 );
 			}
 
-			if ( in_array( $operator, [ 'regex', 'reg', 'rx' ] ) ) {
+			if ( in_array( $operator, self::REGEX_OPERATORS ) ) {
 				return $this->regexComparison( $value1, $value2 );
 			}
 
@@ -159,11 +172,11 @@ if ( ! class_exists( 'Comparator' ) ) :
 				case 'string':
 					return $this->stringComparison( (string) $value1, $value2, $operator );
 				case 'float':
-					return $this->numericComparison( (float) $value1, (float) $value2, $operator, $useEpsilon );
+					return $this->numericComparison( (float) $value1, (float) $value2, $operator, $useEpsilon, (float) $value3 );
 				case 'int':
-					return $this->numericComparison( (int) $value1, (int) $value2, $operator );
+					return $this->numericComparison( (int) $value1, (int) $value2, $operator, false, (int) $value3 );
 				case 'date':
-					return $this->dateComparison( $value1, $value2, $operator );
+					return $this->dateComparison( (string) $value1, (string) $value2, $operator, (string) $value3 );
 				case 'array':
 					$value1 = $this->toArray( $value1 );
 					$value2 = $this->toArray( $value2 );
@@ -197,18 +210,20 @@ if ( ! class_exists( 'Comparator' ) ) :
 
 			// Mapping of operator aliases to their canonical form
 			$operatorAliases = [
-				'=='     => [ 'equal_to', 'equals', '=' ],
-				'==='    => [ 'strict_equal_to' ],
-				'!='     => [ 'not_equal_to', 'not_equals' ],
-				'!=='    => [ 'strict_not_equal_to' ],
-				'>'      => [ 'more_than', 'greater_than' ],
-				'<'      => [ 'less_than' ],
-				'>='     => [ 'at_least', 'greater_than_or_equal_to' ],
-				'<='     => [ 'at_most', 'less_than_or_equal_to' ],
-				'starts' => [ 'startswith', 'starts_with', 'begins_with' ],
-				'ends'   => [ 'endswith', 'ends_with' ],
-				'all'    => [ 'includes_all', 'contains_all', 'has_all', 'match_all' ],
-				'any'    => [ 'includes_any', 'contains_any', 'contains', 'has', 'match_any' ],
+				'=='          => [ 'equal_to', 'equals', '=' ],
+				'==='         => [ 'strict_equal_to' ],
+				'!='          => [ 'not_equal_to', 'not_equals' ],
+				'!=='         => [ 'strict_not_equal_to' ],
+				'>'           => [ 'more_than', 'greater_than' ],
+				'<'           => [ 'less_than' ],
+				'>='          => [ 'at_least', 'greater_than_or_equal_to' ],
+				'<='          => [ 'at_most', 'less_than_or_equal_to' ],
+				'starts'      => [ 'startswith', 'starts_with', 'beginswith', 'begins_with' ],
+				'ends'        => [ 'endswith', 'ends_with' ],
+				'all'         => [ 'includes_all', 'contains_all', 'has_all', 'match_all' ],
+				'any'         => [ 'includes_any', 'contains_any', 'contains', 'has', 'match_any' ],
+				'between'     => [ 'within' ],
+				'not_between' => [ 'not between', 'not_within' ]
 			];
 
 			// Normalize the input operator to lowercase
@@ -238,7 +253,7 @@ if ( ! class_exists( 'Comparator' ) ) :
 				return is_callable( $customFunction );
 			}
 
-			return in_array( $operator, $this->validOperators );
+			return in_array( $operator, self::VALID_OPERATORS );
 		}
 
 		/** Comparison ****************************************************************/
@@ -291,10 +306,11 @@ if ( ! class_exists( 'Comparator' ) ) :
 		 * @param mixed  $value2     The second value to compare.
 		 * @param string $operator   The comparison operator to use.
 		 * @param bool   $useEpsilon Indicates whether to use epsilon for floating-point comparison.
+		 * @param mixed  $value3     The upper bound for BETWEEN comparisons (optional).
 		 *
 		 * @return bool The result of the comparison. Returns false if an unsupported operator is used.
 		 */
-		private function numericComparison( $value1, $value2, string $operator, bool $useEpsilon = false ): bool {
+		private function numericComparison( $value1, $value2, string $operator, bool $useEpsilon = false, $value3 = null ): bool {
 
 			// Apply epsilon logic for floating point equality comparisons
 			if ( $useEpsilon && is_float( $value1 ) && is_float( $value2 ) ) {
@@ -304,6 +320,17 @@ if ( ! class_exists( 'Comparator' ) ) :
 					case '!=':
 						return abs( $value1 - $value2 ) >= $this->epsilon;
 				}
+			}
+
+			// Handling BETWEEN and NOT BETWEEN operators
+			if ( $operator === 'between' || $operator === 'not between' ) {
+				if ( ! is_numeric( $value3 ) ) {
+					throw new InvalidArgumentException( "BETWEEN and NOT BETWEEN operators require three numeric values." );
+				}
+
+				$isBetween = $value1 >= $value2 && $value1 <= $value3;
+
+				return $operator === 'not between' ? ! $isBetween : $isBetween;
 			}
 
 			// Standard comparison for other cases and operators
@@ -358,6 +385,12 @@ if ( ! class_exists( 'Comparator' ) ) :
 					} else {
 						return strpos( $value1, $value2 ) === 0;
 					}
+				case 'ends':
+					if ( is_array( $value2 ) ) {
+						$value2 = end( $value2 );
+					}
+
+					return substr( $value1, - strlen( $value2 ) ) === $value2;
 				case 'all':
 					if ( is_array( $value2 ) ) {
 						foreach ( $value2 as $element ) {
@@ -382,12 +415,6 @@ if ( ! class_exists( 'Comparator' ) ) :
 					} else {
 						return strpos( $value1, $value2 ) !== false;
 					}
-				case 'ends':
-					if ( is_array( $value2 ) ) {
-						$value2 = end( $value2 );
-					}
-
-					return substr( $value1, - strlen( $value2 ) ) === $value2;
 				default:
 					return false;
 			}
@@ -398,17 +425,20 @@ if ( ! class_exists( 'Comparator' ) ) :
 		 *
 		 * Converts date strings into timestamps and performs a numeric comparison between them.
 		 *
-		 * @param string $date1    The first date string.
-		 * @param string $date2    The second date string.
-		 * @param string $operator The comparison operator to use.
+		 * @param string      $date1    The first date string.
+		 * @param string      $date2    The second date string.
+		 * @param string      $operator The comparison operator to use.
+		 * @param string|null $date3    Optional. The upper bound date string for 'BETWEEN' comparisons.
 		 *
 		 * @return bool The result of the comparison.
 		 */
-		private function dateComparison( string $date1, string $date2, string $operator ): bool {
+		private function dateComparison( string $date1, string $date2, string $operator, ?string $date3 = null ): bool {
 			$timestamp1 = strtotime( $date1 );
 			$timestamp2 = strtotime( $date2 );
+			$timestamp3 = $date3 ? strtotime( $date3 ) : null;
 
-			return $this->numericComparison( $timestamp1, $timestamp2, $operator );
+
+			return $this->numericComparison( $timestamp1, $timestamp2, $operator, false, $timestamp3 );
 		}
 
 		/**
@@ -433,6 +463,10 @@ if ( ! class_exists( 'Comparator' ) ) :
 					return $array1 == $array2;
 				case '!=':
 					return $array1 != $array2;
+				case 'starts':
+					return reset( $array1 ) === reset( $array2 );
+				case 'ends':
+					return end( $array1 ) === end( $array2 );
 				case 'all':
 					foreach ( $array2 as $item ) {
 						if ( ! in_array( $item, $array1, true ) ) {
@@ -449,10 +483,6 @@ if ( ! class_exists( 'Comparator' ) ) :
 					}
 
 					return false;
-				case 'starts':
-					return reset( $array1 ) === reset( $array2 );
-				case 'ends':
-					return end( $array1 ) === end( $array2 );
 				default:
 					return false;
 			}
@@ -596,11 +626,9 @@ if ( ! class_exists( 'Comparator' ) ) :
 
 				return is_null( $decoded ) ? (array) $value : $decoded;
 			}
-			if ( is_object( $value ) ) {
-				return (array) $value;
-			}
 
 			return (array) $value;
+
 		}
 
 		/**

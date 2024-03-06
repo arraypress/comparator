@@ -11,15 +11,13 @@
     }
   ],
   "require": {
-    "php": "^7.4 || ^8.0"
+    "php": "^7.4 || ^8.0",
+    "ext-json": "*"
   },
   "autoload": {
     "psr-4": {
       "ArrayPress\\Utils\\": "src/"
-    },
-    "files": [
-      "src/Functions.php"
-    ]
+    }
   },
   "minimum-stability": "dev",
   "prefer-stable": true
