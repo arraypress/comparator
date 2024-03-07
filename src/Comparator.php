@@ -223,7 +223,7 @@ if ( ! class_exists( 'Comparator' ) ) :
 				'all'         => [ 'includes_all', 'contains_all', 'has_all', 'match_all' ],
 				'any'         => [ 'includes_any', 'contains_any', 'contains', 'has', 'match_any' ],
 				'between'     => [ 'within' ],
-				'not_between' => [ 'not between', 'not_within' ]
+				'not_between' => [ 'not between', 'notbetween', 'not_within' ]
 			];
 
 			// Normalize the input operator to lowercase
