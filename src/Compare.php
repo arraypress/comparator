@@ -1,6 +1,6 @@
 <?php
 /**
- * Comparator Functions
+ * Compare Helper Class
  *
  * @package     ArrayPress/Comparator
  * @copyright   Copyright (c) 2024, ArrayPress Limited
@@ -23,8 +23,9 @@ use Exception;
  * and handling of complex types like JSON strings.
  */
 if ( ! class_exists( 'Compare' ) ) :
+
 	/**
-	 * Class Comparator provides functionality for comparing values.
+	 * Compare helper class
 	 */
 	class Compare {
 
